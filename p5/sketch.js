@@ -4,214 +4,178 @@ let serial;
 let latestData = "waiting for data";
 let currentState = "classifying"
 let data_to_label = null;
-let data_to_classify = null;
 let current_classification = null;
 let current_label = null;
+let line_height = 40;
 
-labels = ["hot", "cold"];
 
 var label_controls;
 var classify_controls;
 
-labels = ["hot", "cold"];
 dataset = [];
 
+// Main p5 setup function - called once at the beginning
+function setup() {
+    createCanvas(windowWidth, windowHeight-30);
+    setupSerial();
+    setupGUI();
+    setState("label")
+
+}
+
+// Main p5 draw function - called every time something happens
+function draw() {
+    textSize(line_height);
+    // In this skeleton example, the sketch will only show whatever the incoming data is.
+    background(255, 255, 255);
+    fill(0, 0, 0);
+    if (currentState === "label") draw_labelling()
+    else if (currentState === "classify") draw_classifying()
+    else if (currentState === "train") draw_training()
+}
+
+// Response to data coming in
+function gotData(currentString) {
+
+    // If currentString is empty, this if statement will return "true" and exit the gotData function. Empty variables are 'falsy' values. You can read more about this on this page: https://developer.mozilla.org/en-US/docs/Glossary/Falsy
+    if (!currentString) return;
+    //console.log(currentString);
+
+    sp = currentString.split(":")
+    cmd = sp[0];
+    data = sp[1];
+    if (cmd === "test") doTest(data);
+    else if (cmd === "label") setState("label",data);
+    else if (cmd === "classify") setState("classify",data);
+    else if (cmd === "state") setState(data, null);
+    else { print(`Unknonwn command: ${cmd}`) }
+}
 
 
 function setupGUI() {
-  label_controls = createDiv();
-  label_controls.position(0,0)
-  lab_class_button = createButton('Classify');
-  lab_class_button.position(300,0);
-  lab_class_button.parent(label_controls);
-  lab_class_button.mouseClicked(()=>{setState("classifying") })
-  labels.forEach( (p) => {
-    console.log(`Creating button: ${p}`)
-    b = createButton(p)
-    b.mouseClicked(()=>{doLabel(p)})
-    b.parent(label_controls)
-  })   
-  
-  
-  classify_controls = createDiv();
-  classify_controls.position(0,0)
-  class_lab_button = createButton('Label');
-  class_lab_button.position(300,0);
-  class_lab_button.parent(classify_controls);
-  class_lab_button.mouseClicked(()=>{setState("labelling") })
+    state_controls = createDiv("State: ");
+    //state_controls.position(0, 0)
+    state_controls.style("background-color", "#8b8b8b");
+
+    class_lab_button = createButton('Label');
+    //class_lab_button.position(300, 0);
+    class_lab_button.parent(state_controls);
+    class_lab_button.mouseClicked(() => { setState("label") })    
+
+    class_lab_button = createButton('Train');
+    class_lab_button.parent(state_controls);
+    class_lab_button.mouseClicked(() => { setState("train") })    
+
+    state_class_button = createButton('Classify');
+    state_class_button.parent(state_controls);
+    state_class_button.mouseClicked(() => { setState("classify") })
+
+    state_class_button = createButton('Example');
+    state_class_button.parent(state_controls);
+    state_class_button.mouseClicked(() => { doExample() })
+
+    label_controls = createDiv();
+    label_controls.position(0, 0)
+    labels.forEach((p) => {
+        console.log(`Creating button: ${p}`)
+        b = createButton(p)
+        b.mouseClicked(() => { doLabel(p) })
+        b.parent(label_controls)
+    })
+
 
 }
 
-function setupSerial() {
-   // We create a new serialPort object. This lets us read/write through the Serial connection.
-  serial = new p5.SerialPort();
 
-  // We list the available ports and also try opening a connection to the serialPort you specified at the top.
-  serial.list();
-  serial.open(serialPortName);
 
-  // These next few lines run based on different events, for example when the p5.sketch succesfully connects to the server or the data comes in. We don't have to touch them often. These events are defined in setup, but will always run as long as the sketch is running. They don't have be defined in the draw() function.
-  serial.on("connected", serverConnected);
-  serial.on("list", gotList);
-  serial.on("data", gotSerialData);
-  serial.on("error", gotError);
-  serial.on("open", gotOpen);
-  serial.on("close", gotClose);
-}
+function setState(st, data=null) {
+    console.log(`Setting state: ${st}`)
+    data_to_label = null;
+    current_classification = null;
+    current_label = null;
 
-function setState(st) {
-  console.log(`Setting state: ${st}`)
-  if( st === "classify") {
-    classify_controls.show();
-    label_controls.hide();
-  }
-  if( st === "label") {
-    classify_controls.hide();
-    label_controls.show();
-  }
-  currentState = st;
-  data_to_classify = null;
-  data_to_label = null;
-  current_classification = null;
-  current_label = null;
+    if (st === "classify") {
+        label_controls.hide();
+        if( data ) doClassification( parseData(data) )
+    }
+    if (st === "label") {
+        label_controls.show();
+        if( data ) data_to_label = parseData(data)
+    }
+    if (st === "train" ) {
+        label_controls.hide();
+        doTraining();
+    }
+    currentState = st;
 
 }
 
-// The name for your serialPort connection to the ItsyBitsy is shown in the p5.serialcontrol app.
-let serialPortName = "/dev/tty.usbmodem1101";
 
-function setup() {
-  createCanvas(windowWidth, windowHeight);
-  setupSerial();
-  setupGUI();
-  setState("label")
- 
-}
 
-function draw() {
-  // In this skeleton example, the sketch will only show whatever the incoming data is.
-  background(255, 255, 255);
-  fill(0, 0, 0);
-  if( currentState === "labelling") draw_labelling()
-  else if( currentState === "classifying") draw_classifying()
-  //text(latestData, 10, 10);
-  //text(currentState, 10, 30 );
-}
 
 function draw_labelling() {
-  background(200, 255, 255)
-  text("Labelling!", 10, 60);
-  text("> " + str(data_to_label), 10, 80);
-  text("is " + str(current_label), 10, 100);
+    background(200, 255, 255)
+    text(`Labelling! ${data_to_label || "<no data yet>"} is ${current_label || "<no label yet>"}`, 10, 2*line_height);
+    textSize(line_height/4);
+    s = dataset.map(d => JSON.stringify(d)).join("\n")
+    text(`Dataset:\n${s}`,20,3*line_height)
+    textSize(line_height);
 
-  
 }
 
 function draw_classifying() {
-  background(255, 200, 255)
-  if( current_classification) {
-    text(str(current_classification), 10, 100);
-  }
-  else if( data_to_classify) {
-    doClassification();
-    text("Classifying!", 10, 60);
-    text("> " + str(data_to_classify), 10, 80);
-  }
-  else {
-    //Shouldn't be here...
-  }
- 
-
-}
-
-function doClassification() {
-    if( ! data_to_classify ) return;
-    if( data_to_classify > 30 ) {
-        print("Got classification of HOT");
-        current_classification = "hot"
-        data_to_classify = null
+    background(255, 200, 255)
+    if( ! model ) {
+        text("Train the model before classifying!", 10, 2*line_height);
+    }
+    else if (current_classification) {
+        text(str(current_classification), 10, 2*line_height);
     } else {
-        print("Got classification of Cold");
-        current_classification = "cold"
-        data_to_classify = null;
+        text("Waiting for data", 10, 2*line_height);
     }
 }
 
+function draw_training() {
+    background(255, 255, 200)
+    text("Training!", 10, 2*line_height);
+
+}
+
+
+
 function doLabel(l) {
-  if( ! data_to_label ) return;
-  console.log(`Labelling ${data_to_label} as ${l}`)
-  dataset.push([data_to_label,l])
-  console.log(dataset)
-  current_label = l;
+    if (!data_to_label) return;
+    console.log(`Labelling ${data_to_label} as ${l}`)
+    addTrainingData(data_to_label, l)
+    current_label = l;
 }
 
-// These functions help you debug the serial connection.
-function serverConnected() {
-  print("Connected to Server");
+async function doClassification(data) {
+    if (!model) {
+        alert("Need to train the model first!")
+        return
+    }
+    label = await classify(data);
+    console.log(`Got classification for ${data} of ${label}`);
+    current_classification = label
 }
 
-function gotList(thelist) {
-  print("List of Serial Ports:");
-
-  for (let i = 0; i < thelist.length; i++) {
-    print(i + " " + thelist[i]);
-  }
+function doTraining() {
+    console.log("Starting to train model")
+    model = null;
+    trainModel();
 }
 
-function gotOpen() {
-  print("Serial Port is Open");
-}
-
-function gotClose() {
-  print("Serial Port is Closed");
-  latestData = "Serial Port is Closed";
-}
-
-function gotError(theerror) {
-
-  print(theerror);
-}
-
-// This function reads the incoming serial connection. It takes the current line, removes any extra spaces, and saves it to latestData.
-
-function gotSerialData() {
-  let currentString = serial.readLine();
-  trim(currentString);
-  gotData(currentString)
-}
-
-function gotData(currentString) {
-
-  // If currentString is empty, this if statement will return "true" and exit the gotData function. Empty variables are 'falsy' values. You can read more about this on this page: https://developer.mozilla.org/en-US/docs/Glossary/Falsy
-  if (!currentString) return;
-  //console.log(currentString);
-  
-  sp = currentString.split(":")
-  cmd = sp[0];
-  data = sp[1];
-  if( cmd === "label" ) label(data);
-  else if( cmd === "classify") classify(data);
-  else if( cmd === "state" ) setState(data);
-  else if( cmd === "test") doTest(data);
-  else {print(`Unknonwn command: ${cmd}`)}
-}
-
-function label(data) {
-  print(`going to label data: ${data}`)
-  setState("labelling")
-  data_to_label = parseData(data)
-}
-function classify(data) {
-  print(`going to classify data: ${data}`)
-  data_to_classify = parseData(data)
-  print(`Got data: ${data_to_classify}`)
+function doExample() {
+    setExampleData();
+    doTraining();
 }
 
 function parseData(data) {
-  return data.split(" ").map(parseFloat)
+    return data.split(" ").map(parseFloat)
 }
 
 function doTest(data) {
-  //latestData = `Running test number: ${data}`;
+    //latestData = `Running test number: ${data}`;
 }
 
