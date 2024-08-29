@@ -1,0 +1,3 @@
+- Currently running iwth p5 server: https://osteele.github.io/p5-server/#quick-start--installation
+- The particular model is set by including a different `-model.js` file. Available options:
+  - `toy-model.js` computes the average of each class, and then picks the closest one
