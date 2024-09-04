@@ -9,6 +9,42 @@ let current_label = null;
 let line_height = 40;
 
 
+const responses = {
+    human : {
+        stories: [
+            "You are a happy human",
+            "You are breathing and making eyecontact like a normal person",
+            "Self-awareness is a human trait. Embrace your quirks and stay curious!",
+            "If you feel cold in winter, you’re not a lizard",
+        ],
+        images: [
+            "images/person1.webp",
+            "images/person2.jpg",
+            "images/person3.webp",
+        ]
+    },
+    lizard : {
+        stories: [ // > please write a 30 word piece of advice for a lizard person trying to pretend to be human
+            "You are a secret lizard person",
+            "Hide your tail so they don't notice you. Remember to blink",
+            "Blend in by mimicking human expressions, but not too perfectly.",
+            "Smile at random; it’s socially expected",
+            "Don’t mention eating insects—stick to 'pizza.'",
+            "Pretend to find the weather fascinating"
+        ],
+        images: [
+            "images/lizard1.webp",
+            "images/lizard2.webp",
+            "images/lizard3.jpg"
+        ]
+    }
+}
+
+let classification_label = null;
+let classification_story = null;
+let classification_image = null;
+let classification_text_color = null;
+
 var label_controls;
 var classify_controls;
 
@@ -93,6 +129,10 @@ function setState(st, data=null) {
     data_to_label = null;
     current_classification = null;
     current_label = null;
+    classification_label = null;
+    classification_story = null;
+    classification_image = null;
+    classification_text_color = null;
 
     if (st === "classify") {
         label_controls.hide();
@@ -127,13 +167,26 @@ function draw_classifying() {
     background(255, 200, 255)
     if( ! model ) {
         text("Train the model before classifying!", 10, 2*line_height);
-    }
-    else if (current_classification) {
-        text(str(current_classification), 10, 2*line_height);
-    } else {
+    } else if (!current_classification) {
         text("Waiting for data", 10, 2*line_height);
     }
+    else  { // Really draw the classification
+        //print("Loading image: ",classification_image)
+        //image( loadImage(classification_image),0,0, windowWidth, windowHeight)
+        image( classification_image,0,0, windowWidth, windowHeight)
+        //fill(classification_text_color)
+        fill(0)
+        stroke(255)
+        strokeWeight(5)
+        text(classification_label, 10, 2*line_height)
+        textSize(line_height/2)
+        text(classification_story, 10, 4*line_height, 200)
+        text(str(current_classification), 10, windowHeight - 2*line_height);
+        stroke(0)
+        strokeWeight(1)
+    }
 }
+
 
 function draw_training() {
     background(255, 255, 200)
@@ -150,13 +203,24 @@ function doLabel(l) {
     current_label = l;
 }
 
+function randChoice(arr) {
+    return arr[Math.floor(Math.random() * arr.length)]
+  }
+
 async function doClassification(data) {
     if (!model) {
         alert("Need to train the model first!")
         return
     }
-    label = await classify(data);
+    var [label_obj,label_str] = await classify(data);
+    label = label_str
     console.log(`Got classification for ${data} of ${label}`);
+    console.log(label_obj)
+    classification_label = label_obj[0]['label'] // Get the label of the most probable class
+    console.log(`Classification ID:`, classification_label)
+    console.log(`Responses:`,responses[classification_label])
+    classification_story = randChoice( responses[classification_label]['stories'] )
+    classification_image = loadImage( randChoice( responses[classification_label]['images'] ) )
     current_classification = label
 }
 

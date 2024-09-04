@@ -1,5 +1,5 @@
 // The name for your serialPort connection to the ItsyBitsy is shown in the p5.serialcontrol app.
-let serialPortName = "/dev/tty.usbmodem1101";
+let serialPortName = "/dev/tty.usbmodem2101";
 
 // These functions help you debug the serial connection.
 function serverConnected() {
