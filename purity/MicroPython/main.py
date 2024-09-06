@@ -7,6 +7,7 @@ from modulino import (
     ModulinoPixels,
     ModulinoDistance,
 )
+
 from machine import Pin
 
 pixels = ModulinoPixels()
@@ -57,4 +58,3 @@ while False:
         handle_message(incoming_message)
 
     time.sleep(0.05)
- 
