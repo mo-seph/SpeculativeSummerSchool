@@ -1,22 +1,24 @@
-// To find your model link, go to the teachable machine page. Hit "Export Model", then hit "Upload my model" then wait until it is uploaded, then copy the link under the "Your sharable link" section and paste it in here
-const modelURL = "https://teachablemachine.withgoogle.com/models/0fKTsO4rx/";
+// SERIAL CONNECTION VARIABLES
+let serial;
+let latestData = "waiting for data";
 
-// These are the classes our model shows. Make sure to update these to match the classes in your model
-const classes = ["Sure", "not sure"];
+// TEACHABLE MACHINE VARIABLES
 
-// We will use this to count the amount of times each class is seen.
-let count = 0;
-let direction = 1;
+// const modelURL = "https://teachablemachine.withgoogle.com/models/0fKTsO4rx/"; // This is the model made by the team
+const modelURL = "https://teachablemachine.withgoogle.com/models/YRVeU9S7S/"; // this is my model for testing
 
-/*^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Make sure to update the variables above before continuing.
-********************************/
+const classes = ["empty", "object"];
+let counter = 0;
 let classifier;
 let video;
 let flippedVideo;
 let label;
-let isSure = false;
+let conf;
+// let isSure = false;
+const incrementVal = 0.01;
 let lastTime = 0;
+let prevRGB = "";
+let activeRGB = "";
 
 function preload() {
   // Load the image classifier model (a.k.a. the created AI)
@@ -28,61 +30,71 @@ function setup() {
   video = createCapture(VIDEO);
   video.size(320, 260);
   video.hide();
-  // frameRate(30);
+  setupSerial();
+  frameRate(30);
   flippedVideo = ml5.flipImage(video); // Video needs to be flipped
   classifyVideo(); // Capture video and start classifying it.
   lastTime = millis();
+  background(0);
 }
 
 function draw() {
-  if (millis() - lastTime > 3000) {
-    // update the counter every second
-    if (isSure) {
-      count++;
-    } else {
-      count--;
-    }
-
-    if (count > 30) {
-      count = 30; // Set to upper limit if it exceeds 30
-    } else if (count < -30) {
-      count = -30; // Set to lower limit if it exceeds -30
-    }
-    const r = map(count, -30, 30, 255, 0); // Red decreases from 255 to 0
-    const g = map(count, -30, 30, 0, 255); // Green increases from 0 to 255
-    background(r, g, 0); // Background color changes from red to green
+  // update the counter every frame
+  if (label == "object" && conf > 0.9) {
+    counter += incrementVal;
+  } else {
+    counter -= incrementVal;
   }
 
-  fill(255); // If we have a box on video, make the background green. Otherwise make the background red
+  if (counter > 1) {
+    counter = 1; // Set to upper limit if it exceeds 1
+  }
+  if (counter < 0) {
+    counter = 0; // Set to lower limit if it exceeds 0
+  }
 
-  image(flippedVideo, 0, 0); // Add the video currently being classified to the left side of the screen
+  // TODO - every second update the background color based on the counter
+  if (millis() - lastTime > 1000) {
+    let r = map(counter, 0, 1, 255, 0); // Red decreases from 255 to 0
+    let g = 0; // Green stays 0
+    let b = map(counter, 0, 1, 0, 255); // Blue increases from 0 to 255
+    let rgb = [floor(r), floor(g), floor(b)];
+    activeRGB = rgb.join(":");
+    if (prevRGB !== activeRGB) {
+      console.log(`An updated color: ${activeRGB}`);
+      serial.write(activeRGB + "\n"); // Write the colorCode to the
+      background(rgb[0], rgb[1], rgb[2]);
+    }
 
-  textSize(16);
-  textAlign(CENTER);
-  text(label, (3 * width) / 4, height - 4); // Add text with what the AI classifies the video as on the bottom right side of the screen
+    lastTime = millis();
+    prevRGB = activeRGB;
+  }
+
+  fill(255);
+  image(flippedVideo, 0, 0);
 }
 
 function classifyVideo() {
   flippedVideo = ml5.flipImage(video);
   classifier.classify(flippedVideo, gotResult);
-  flippedVideo.remove(); //  Make the classifier view the video and call the function "gotResult" with the result.
+  flippedVideo.remove();
 }
 
 function gotResult(error, results) {
   if (error) {
-    // If an error occurs, print it in the console.
     console.error(error);
     return;
   }
 
-  label = String(results[0].label); // This is the result of the AI
-  conf = Number(results[0].confidence); // This is the confidence of the AI in the result
-  if (label == classes[0]) {
-    isSure = true;
-  } else {
-    isSure = false;
-  }
-  console.log(`label: ${label}; confidence: ${conf}`);
+  label = String(results[0].label);
+  conf = Number(results[0].confidence);
 
-  classifyVideo(); // Classify the next image in the video.
+  classifyVideo();
+}
+
+function gotData(currentString) {
+  // If currentString is empty, this if statement will return "true" and exit the gotData function. Empty variables are 'falsy' values. You can read more about this on this page: https://developer.mozilla.org/en-US/docs/Glossary/Falsy
+  if (!currentString) return;
+  //console.log(currentString);
+  console.log(`${currentString}`);
 }
